@@ -1,0 +1,128 @@
+train['year']<- substr(train$X.U.FEFF.REG_YYMM,1,4)
+train['month']<- substr(train$X.U.FEFF.REG_YYMM,5,6)
+
+str(tr)
+library(nnet)
+library(mgcv)
+library(yardstick)
+library(zeallot)
+library(gridExtra)
+library(elasticnet)
+library(MASS)
+library(pls)
+library(ggthemes)
+library(extrafont)
+library(mgcv)
+library(ranger)
+library(broom)
+library(MLmetrics)
+
+sub<-rename(sub,"AMT"="xgb_AMT")
+sub1<-sub[,-c(4,5)]
+sub2<-sub[,-c(1,2,3)]
+sub3<-cbind(sub2,sub1)
+
+sub3<-sub3[c(order(sub3$id)),]
+
+##데이터 분할
+in_tr <- createDataPartition(tr$AMT, p = c(0.7, 0.3), list = FALSE)
+
+training <- tr[in_tr, ]
+validation_test <- tr[-in_tr, ]
+
+### 타당성검증 vs 시험
+in_test <- createDataPartition(validation_test$AMT, p = c(0.5, 0.5), list = FALSE)
+
+validation <- validation_test[-in_test, ]
+testing <- validation_test[in_test, ]
+
+# 0. 환경설정 ------
+memory.size(max = TRUE)    # OS에서 얻은 최대 메모리 크기 = OS로부터 R이 사용 가능한 메모리
+memory.size(max = FALSE)   # 현재 사용중인 메모리 크기
+memory.limit(size = NA)    # 컴퓨터의 최대 메모리 한계치 
+
+memory.limit(size = 50000)   
+
+.libPaths("C:/myRproject/Library")
+.libPaths()
+
+install.packages("caret")
+install.packages("xgboost")
+install.packages("recipes")
+
+library(caret)
+library(xgboost)
+library(recipes)
+
+
+setwd("D:/deep1")
+tr <-read.csv("D:/deep1/202004.csv",header=T,  stringsAsFactors=FALSE,encoding="UTF-8")
+submission_sample <-read.csv("D:/deep1/submission_sample.csv", stringsAsFactors=FALSE
+                             ,encoding="UTF-8")
+
+names(submission_sample) [names(submission_sample) == "X.U.FEFF.id"] <- c("id")
+names(tr) [names(tr) == "X.U.FEFF.REG_YYMM"] <- c("REG_YYMM")
+
+##날짜 처리
+tr<-train[train$X.U.FEFF.REG_YYMM==202003,]
+submission_sample<-submission_sample[submission_sample$REG_YYMM==202004,]
+
+
+##데이터 정제
+tr$CARD_SIDO_NM<-as.factor(tr$CARD_SIDO_NM)
+tr$STD_CLSS_NM<-as.factor(tr$STD_CLSS_NM)
+tr$SEX_CTGO_CD <-as.factor(tr$SEX_CTGO_CD)
+tr$AGE <-as.factor(tr$AGE)
+tr$FLC<-as.factor(tr$FLC)
+
+tr<-tr[,-c(5,6)]
+str(tr)
+
+# 3.2. Y 변수 변환 --------------------------------
+tr$log_AMT<-log(tr$AMT)
+
+
+##모형 수식 --------------------------------
+y_var <- "log_AMT"
+x_var <- setdiff(names(tr), c(y_var, "AMT"))
+
+tuc_fmla <- as.formula(paste(y_var, "~", paste(x_var, collapse="+")))
+
+
+## 3.5. xgboost --------------------------------
+tuc_rec <- recipe(tuc_fmla, data=tr)
+tuc_rec <- tuc_rec %>% 
+  step_dummy(all_nominal())
+
+tuc_dm <- prep(tuc_rec)
+
+tuc_clean_df <- bake(tuc_dm, new_data = tr) 
+
+tuc_xgb <- xgboost(data = as.matrix(tuc_clean_df), 
+                   label = tr$AMT,
+                   nrounds = 100,
+                   objective = "reg:linear",
+                   eta = 0.3,
+                   max_depth = 6,
+                   verbose = 0)
+
+tr$xgb_AMT <- predict(tuc_xgb, as.matrix(tuc_clean_df))
+head(tr)
+tr %>% 
+  mutate(resid_xgb = log(xgb_AMT) - log_AMT) %>% 
+  summarise(rmse_xgb = sqrt(mean(resid_xgb^2)))
+
+sum_tr<-tr %>%
+  group_by(REG_YYMM,CARD_SIDO_NM,STD_CLSS_NM) %>%
+  summarize(AMT = sum(xgb_AMT))
+
+
+df<-sum_tr[,c("REG_YYMM","CARD_SIDO_NM", "STD_CLSS_NM", "AMT")]
+submission <- submission_sample[,c('id','REG_YYMM','CARD_SIDO_NM', 'STD_CLSS_NM')]
+sub <- left_join(x = submission, 
+                 y = sum_tr, 
+                 by = c("REG_YYMM","CARD_SIDO_NM","STD_CLSS_NM")) 
+#결측값을 다른 값으로 대체
+sub$AMT[is.na(sub$AMT)] <- 0
+
+write.csv(sub,file="submission.csv")

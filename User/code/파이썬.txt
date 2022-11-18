@@ -1,0 +1,4 @@
+import pandas as pd
+data = pd.read_csv('D:/deep1/submission.csv')
+data.drop('Unnamed: 0', axis=1, inplace=True)
+data.to_csv('submission.csv', index=False)

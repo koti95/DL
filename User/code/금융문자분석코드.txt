@@ -1,0 +1,85 @@
+install.packages(c("tm","KoNLP","ROSE"))
+library(tm)
+library(KoNLP)
+library(ROSE)
+library(dplyr) 
+
+# 패키지 설치
+install.packages("pdftools")
+install.packages("stringr")
+
+# 패키지 부착
+library(pdftools)
+library(stringr)
+
+setwd("c:/deep1")
+train <- read.csv("c:/deep1/train.csv", stringsAsFactors = FALSE,fileEncoding = "UTF-8" )
+table(train1$smishing)
+# under sampling
+set.seed(2019)
+train1<-sample_frac(train,0.05)# 1%만큼 무작위 추출 
+str(train1)
+test<- read.csv("c:/deep1/public_test.csv", stringsAsFactors = FALSE,fileEncoding = "UTF-8" )
+train1$smishing <- factor(train1$smishing)
+
+train_corpus <- VCorpus(VectorSource(train1$text))
+train_corpus_clean <- tm_map(train_corpus,content_transformer(tolower)) #대문자를 소문자로 바꿔라
+de<-as.vector(t(read.table("c:/deep1/stopword.txt",sep="",stringsAsFactors = FALSE,fileEncoding = "UTF-8" )))
+train_corpus_clean <- tm_map(train_corpus_clean, removeWords, de)
+train_corpus_clean <- tm_map(train_corpus_clean, removeNumbers) #숫자들을 없애라
+train_corpus_clean <- tm_map(train_corpus_clean, stripWhitespace)# 공백문자 제거 
+train_corpus_clean <- tm_map(train_corpus_clean, removePunctuation)# 특수문자 제거 
+
+test_corpus_clean
+test_corpus <- VCorpus(VectorSource(test$text))
+test_corpus_clean <- tm_map(test_corpus,removeWords, de)
+test_corpus_clean <- tm_map(test_corpus_clean, removeNumbers) #숫자들을 없애라
+test_corpus_clean <- tm_map(test_corpus_clean, stripWhitespace)# 공백문자 제거 
+test_corpus_clean <- tm_map(test_corpus_clean, removePunctuation)# 특수문자 제거 
+
+#분석
+train_dtm <- DocumentTermMatrix(train_corpus_clean) #정제된 텍스트를 텀매트릭스로 만들어라
+test_dtm<- DocumentTermMatrix(test_corpus_clean)
+
+#정제된 텍스트를 텀매트릭스로 만들어라
+smishing_freq_words <- findFreqTerms(train_dtm, 10)
+str(smishing_freq_words)
+smishing_dtm_freq_train<- train_dtm[, smishing_freq_words]
+convert_counts <- function(x) { x <- ifelse(x > 0, "Yes", "No") }
+smishing_train <- apply(smishing_dtm_freq_train, MARGIN = 2, convert_counts)
+
+smishing_freq_words2 <- findFreqTerms(test_dtm, 3)
+str(smishing_freq_words)
+smishing_dtm_freq_train2<- test_dtm[, smishing_freq_words2]
+convert_counts <- function(x) { x <- ifelse(x > 0, "Yes", "No") }
+smishing_test2 <- apply(smishing_dtm_freq_train2, MARGIN = 2, convert_counts)
+
+
+
+memory.limit(size = 50000)  
+
+install.packages("e1071") 
+library(e1071)
+smishing_classifier <-naiveBayes(smishing_train, train1$smishing)
+smishing_test_pred <- predict(smishing_classifier, smishing_test2)
+table(smishing_test_pred)
+
+library(gmodels)
+CrossTable(sms_test_pred, sms_test_labels,
+           prop.chisq = FALSE, prop.t = FALSE,
+           dnn = c('predicted', 'actual'))
+
+sms_classifier2 <- naiveBayes(sms_train, sms_train_labels, laplace = 1)
+
+sms_test_pred2 <- predict(sms_classifier2, sms_test)
+
+
+
+
+train_corpus_clean <- tm_map(train_corpus_clean, content_transformer(tolower))#소문자 변경 
+# 예측값 입력 
+submission <-read.csv("c:/deep1/submission.csv", stringsAsFactors=FALSE
+                             ,fileEncoding = "UTF-8")
+submission['smishing']<-smishing_test_pred
+write.csv(submission, file="submission.csv")
+str(submission)

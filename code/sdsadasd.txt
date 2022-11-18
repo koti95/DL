@@ -1,0 +1,13 @@
+
+tdmat2 <- TermDocumentMatrix(docs.corp, control=list(weighting = function(x) weightTfIdf(x, TRUE),
+                                                     wordLengths=c(1,Inf)))
+
+
+train_dtm2 <- DocumentTermMatrix(train_corpus_clean, control = list(
+tolower = TRUE, removeNumbers = TRUE, stopwords = TRUE, removePunctuation = TRUE, stemming = TRUE ))
+
+train_dtm <- TermDocumentMatrix(train_corpus_clean,
+                                control=list(tokenize="scan", wordLengths=c(1, Inf)))
+tds <- train_dtm[sapply(Terms(train_dtm), nchar) > 1,]#길이가 2이상인 단어들만 이용하여 TDM구성
+tds <- removeSparseTerms(tds, sparse=0.90)#: 10%이상의 문서에서 출현하는 단어들만 이용하여 TDM구성
+head(train_dtm2)

@@ -1,0 +1,38 @@
+install.packages(c("tm","wordcloud"))
+
+library(tm)
+
+library(wordcloud)
+oz<-file("http://www.gutenberg.org/cache/epub/55/pg55.txt")
+oz1<-readLines(oz)
+
+oz1 <- Corpus(VectorSource(oz1))
+
+oz1 <- tm_map(oz1, stripWhitespace) 
+
+oz1 <- tm_map(oz1, removeNumbers)
+
+oz1 <- tm_map(oz1, removePunctuation)
+
+oz1 <- tm_map(oz1, content_transformer(tolower))
+
+oz1 <- tm_map(oz1, removeWords, stopwords("en"))
+
+oz1 <- tm_map(oz1, function(x)removeWords(x,"and"))
+
+dtm <- DocumentTermMatrix(oz1)
+
+m <- as.matrix(dtm)
+
+v <- sort(colSums(m), decreasing=TRUE)
+
+d <- data.frame(word = names(v), freq=v)
+
+library(RColorBrewer)
+
+pal <- brewer.pal(9,"Set1")
+
+x11()
+
+wordcloud(d$word, d$freq,scale=c(5,1),rot.per=0.25,min.freq=20,random.order=F,random.color=T,colors=pal)
+#wordcloud2(d,size=1, color = "random-light", shape="star")

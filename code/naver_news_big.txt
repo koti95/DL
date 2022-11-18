@@ -1,0 +1,110 @@
+
+setwd("c:/data")  # 작업공간 지정
+
+install.packages("rvest")  # install.packages("패키지이름")
+install.packages("httr")
+install.packages("stringr")
+install.packages("dplyr")
+
+
+library(rvest)          # library(패키지이름)
+library(httr)
+library(stringr)
+library(dplyr)
+
+
+
+
+#검색페이지10개불러오기
+
+url1="https://search.naver.com/search.naver?where=news&sm=tab_jum&query=빅데이터"
+url2="&sm=&start="
+page_no <- seq(1,41,10)
+search_url = as.character()
+for(i in 1:5)
+{
+  url<- paste(url1,url2,page_no[i],sep = "")
+  search_url <- c(search_url,url)
+}
+search_url
+
+
+
+#검색페이지10개에서 네이버뉴스기사들 주소 불러오기
+
+get_url <- NULL
+
+for(j in 1:length(search_url))
+{
+  b<-read_html(search_url[j])
+  c<-html_nodes(b, '._sp_each_url')
+  urls <- html_attr(c, 'href')
+  for(i in 1 : length(urls))
+  {
+    if(substr(urls[i],1,22) != 'http://news.naver.com/') 
+    {
+      urls[i]<-NA
+    }
+  }
+  get_url <- c(get_url,urls)
+}
+get_url <- get_url[!is.na(get_url)]
+get_url
+
+
+#텍스트 내용 저장
+
+tm.data <- list()
+for(i in 1:length(get_url))
+{
+  try({url = get_url[i]
+  htxt = read_html(url)
+  comments <- html_nodes(htxt, '#articleBodyContents')
+  get_news <- repair_encoding(html_text(comments))
+  tm.data[[i]] <- get_news}
+  ,silent = TRUE)
+}
+head(tm.data)
+
+
+#중복된기사 제거
+
+unique(tm.data)
+
+
+#결측값제거
+
+tm.data2 <- unlist(tm.data)
+for(i in 1:41)
+{
+  tm.data2[i] <- gsub('[\n\t//(){}]',"",tm.data2[i])
+  tm.data2[i] <- gsub('function _flash_removeCallback',"",tm.data2[i])
+  tm.data2[i] <- gsub('flash 오류를 우회하기 위한 함수 추가',"",tm.data2[i])
+  tm.data2[i] <- gsub('[▶@]',"",tm.data2[i])
+  tm.data2[i] <- gsub("있다","",tm.data2[i])
+}
+
+write.csv(tm.data2,"big.data2.csv")
+
+
+install.packages("tm")
+install.packages("wordcloud2")
+install.packages("KoNLP")
+
+library(KoNLP)
+library(tm)
+library(wordcloud2)
+
+f <-read.csv("c:/data/big.data2.csv", header=T,stringsAsFactors = F)
+my <- Corpus(VectorSource(f$x))
+my<-tm_map(my, PlainTextDocument)
+my <- tm_map(my, tolower)
+tdm<-TermDocumentMatrix(my)
+m<-as.matrix(tdm)
+
+v<-sort(rowSums(m), decreasing = T)
+d <- data.frame(word = names(v), freq=v)
+library(RColorBrewer)
+pal <- brewer.pal(9,"Set1")
+
+wordcloud2(d, shape="star")

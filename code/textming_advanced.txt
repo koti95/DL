@@ -1,0 +1,86 @@
+install.packages(c("tm","topicmodels","slam"))
+library(tm)
+library(topicmodels)
+library(slam)
+
+ex<-c(" I had a peanut butter sandwich for breakfast.",
+      "I like to eat almonds, peanuts and walnuts.",
+      " My neighbor got a little dog yesterday.",
+      "Cats and dogs are mortal enemies.",
+      "You mustn’t feed peanuts to your dog.")
+
+names(ex) <- paste("doc", 1:length(ex), sep="")
+ex.corp <- Corpus(VectorSource(ex))
+# 전처리
+ex.corp <- tm_map(ex.corp, tolower) # convert all text to lower case
+ex.corp <- tm_map(ex.corp, removePunctuation) 
+ex.corp <- tm_map(ex.corp, removeNumbers)
+ex.corp <- tm_map(ex.corp, removeWords, stopwords("english")) 
+ex.corp <- tm_map(ex.corp, stemDocument, language = "english") ## Stemming the words 
+ex.corp<-tm_map(ex.corp,stripWhitespace)
+inspect(ex.corp[1:5])
+
+dtm <- DocumentTermMatrix(ex.corp)
+dtm
+# 차원축소
+dtm2 <- removeSparseTerms(dtm, 0.7)
+dtm
+
+# 차원축소 2: Latent Sementic Indexing (SVD) 
+
+m <- as.matrix(dtm)
+n<-nrow(m)
+svd.Y <- svd(m)
+U <- svd.Y$u
+V <- svd.Y$v
+D <- diag(svd.Y$d)
+A <- (sqrt(n-1)*U)[,1:2]
+B <- (sqrt(1/(n-1))*V%*%D)[,1:2]
+rownames(A)<-rownames(m)
+rownames(B)<-colnames(m)
+
+# Godness-of-fit
+eig <- (svd.Y$d)^2
+per <- eig/sum(eig)*100
+gof <- sum(per[1:2])
+list(per, gof)
+
+# PC Biplot
+lim<-range(A)
+biplot(A,B, xlab="Dim1", ylab="Dim2", main="(a) PC Biplot: SVD",
+       cex=1.5, pch=16, col=1, expand=0.7)
+abline(v=0,h=0)
+
+# Topic modeling
+# select number of topics
+
+install.packages("ldatuning")
+
+library("ldatuning")
+
+result <- FindTopicsNumber(
+  dtm,
+  topics = seq(from = 2, to = 5, by = 1),
+  metrics = c("Griffiths2004", "CaoJuan2009", "Arun2010", "Deveaud2014"),
+  method = "Gibbs",
+  control = list(seed = 77),
+  mc.cores = 2L,
+  verbose = TRUE
+)
+
+result 
+install.packages("stringi")
+library(stringi)
+FindTopicsNumber_plot(result) # minimum (Arun, Cao):  maximum(Griffiths, Deveaud)
+
+
+
+#LDA분석
+LDA.result <- LDA(dtm, k = 2)
+a <-posterior(LDA.result, dtm[1:2,])
+write(unlist(a), "c:/cwk/post1.txt")
+
+#결과보기
+terms(LDA.result,4) #토픽별 키워드 보기
+topics(LDA.result) #문서별 토픽번호 보기
+head(topics(LDA.result),20)

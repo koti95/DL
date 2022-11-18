@@ -1,0 +1,86 @@
+install.packages(c("tm","KoNLP","ROSE"))
+library(tm)
+library(KoNLP)
+library(ROSE)
+library(dplyr) 
+
+setwd("c:/deep1")
+train <- read.csv("c:/deep1/train.csv", stringsAsFactors = FALSE,fileEncoding = "UTF-8" )
+test<- read.csv("c:/deep1/public_test.csv", stringsAsFactors = FALSE,fileEncoding = "UTF-8" )
+# under sampling
+set.seed(2019)
+rtrain<-sample_frac(train,0.01)# 1%만큼 무작위 추출 
+rtrain$smishing <- factor(rtrain$smishing)
+train1 <- sapply(rtrain$text, extractNoun, USE.NAMES = F)
+train1 <- unlist(train1)
+data_unlist <- Filter(function(x){nchar(x)>=2}, train1)
+str(data_unlist)
+train2<-gsub('[A-z]','',data_unlist)#영어제거
+train3<-gsub('\\d','',train2)#숫자제거  
+train4 <- gsub('[~!@#$%^&*()_+=?]<>]','',train3)#특수문자 거
+train5 <- gsub('[ㄱ-ㅎ]','',train4)
+train6 <- gsub('(ㅜ|ㅠ)+','',train5)
+train7 <- gsub("하게","하시",train6)
+train8 <- gsub("하기","하시",train7)
+
+str(train8)
+test1 <- sapply(test$text, extractNoun, USE.NAMES = F)
+test1 <- unlist(test1)
+test1 <- Filter(function(x){nchar(x)>=2}, test1)
+test2<-gsub('[A-z]','',test1)#영어제거
+test3<-gsub('\\d','',test2)#숫자제거  
+test4 <- gsub('[~!@#$%^&*()_+=?]<>]','',test3)#특수문자 거
+test5 <- gsub('[ㄱ-ㅎ]','',test4)
+test6 <- gsub('(ㅜ|ㅠ)+','',test5)
+test7 <- gsub("하게","하시",test6)
+test8 <- gsub("하기","하시",test7)
+
+wordcount <- table(train8)
+wordcount_top <-head(sort(wordcount, decreasing = T),100)
+spam <- subset(rtrain, smishing == 1)
+ham <- subset(rtrain, smishing == 0 )
+library(wordcloud)
+wordcloud(spam$text, max.words = 40, scale = c(3, 0.5))
+wordcloud(ham$text, max.words = 40, scale = c(3, 0.5))
+
+
+train_corpus <- VCorpus(VectorSource(train8))
+train_corpus_clean <- tm_map(train_corpus, removePunctuation)# 특수문자 제거 
+train_corpus_clean <- tm_map(train_corpus_clean, stripWhitespace)
+train_corpus_clean<-tm_map(train_corpus_clean,removeWords,c("에서","께서","보다","라고","로써","로서","만큼","하고","이다","이며","부터","로부터","으로부터","마저","조차","만큼","따라","아니라","밖에","대로","이나","입니다"))
+
+test_corpus <- VCorpus(VectorSource(test8))
+test_corpus_clean <- tm_map(test_corpus, stripWhitespace)# 공백문자 제거 
+test_corpus_clean <- tm_map(test_corpus_clean, removePunctuation)# 특수문자 제거 
+train_corpus_clean<-tm_map(train_corpus_clean,removeWords,c("에서","께서","보다","라고","로써","로서","만큼","하고","이다","이며","부터","로부터","으로부터","마저","조차","만큼","따라","아니라","밖에","대로","이나","입니다"))
+
+#분석
+train_dtm <- DocumentTermMatrix(train_corpus_clean) #정제된 텍스트를 텀매트릭스로 만들어라
+tdmat2 <- TermDocumentMatrix(train_corpus_clean, control=list(weighting = function(x) weightTfIdf(x, TRUE),
+                                                     wordLengths=c(1,Inf)))
+test_dtm<- DocumentTermMatrix(test_corpus_clean)
+testdmat2 <- TermDocumentMatrix(test_corpus_clean, control=list(weighting = function(x) weightTfIdf(x, TRUE),
+                                                              wordLengths=c(1,Inf)))
+
+#정제된 텍스트를 텀매트릭스로 만들어라
+smishing_freq_words <- findFreqTerms(train_dtm, 10)
+smishing_dtm_freq_train<- train_dtm[, smishing_freq_words]
+convert_counts <- function(x) { x <- ifelse(x > 0, "Yes", "No") }
+smishing_train <- apply(smishing_dtm_freq_train, MARGIN = 2, convert_counts)
+
+smishing_freq_words2 <- findFreqTerms(test_dtm, 7)
+smishing_dtm_freq_train2<- test_dtm[, smishing_freq_words2]
+convert_counts <- function(x) { x <- ifelse(x > 0, "Yes", "No") }
+smishing_test2 <- apply(smishing_dtm_freq_train2, MARGIN = 2, convert_counts)
+
+install.packages("e1071") 
+library(e1071)
+smishing_classifier <-naiveBayes(smishing_train, rtrain$smishing, laplace = 1)
+smishing_test_pred <- predict(smishing_classifier, smishing_test2)
+table(smishing_train[1])
+
+# 예측값 입력 
+submission <-read.csv("c:/deep1/submission.csv", stringsAsFactors=FALSE
+                             ,fileEncoding = "UTF-8")
+submission$smishing<-smishing_test_pred
+write.csv(submission, file="submission.csv")

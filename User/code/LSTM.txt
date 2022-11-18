@@ -1,0 +1,134 @@
+setwd("c:/deep")
+p<-read.csv("pass1.csv", header=T)
+p<-as.data.frame(p)
+str(p)
+p.tr <- p[1:119,]
+p.te <- p[120:131,]
+install.packages("neuralnet")
+library(neuralnet)
+pp <- neuralnet(xlog~x1+x12+x13, data=p.tr, hidden=2)
+pp
+plot(pp)
+result<-compute(pp, p.te[,5:7]) #모델 결과 
+predicted <- result$net.result#예측값 보기 
+cor(predicted, p.te$xlog)
+val<-data.frame(predicted,p.te$xlog)
+square<-(predicted - p.te$xlog)**2
+sse<-mean(square)
+sse
+
+install.packages("RSNNS")
+library(RSNNS)
+input<-p.tr[,5:7]
+output<-p.tr[,4]
+
+set.seed(12345)
+fit1<-elman(input, output, size=c(9,8), learnFuncParams=c(0.001), maxit=5000)
+summary(fit1)
+pred3<-predict(fit1, p.te[,5:7])
+square3<-(pred3 - p.te$xlog)**2
+sse3<-mean(square3)
+sse3
+
+fit2<-jordan(input, output, size=c(8), learnFuncParams=c(0.001), maxit=5000)
+summary(fit2)
+pred4<-predict(fit2, p.te[,5:7])
+square4<-(pred4 - p.te$xlog)**2
+sse4<-mean(square4)
+sse4
+
+cran <- getOption("repos")
+cran["dmlc"] <- "https://s3-us-west-2.amazonaws.com/apache-mxnet/R/CRAN/"
+options(repos = cran)
+install.packages("mxnet",dependencies = T)
+library(mxnet)
+install.packages("MXNet")
+library(MXNet)
+install.packages("zoo")
+library(zoo)
+train.x <- p.tr[,5:7]
+train.y <- p.tr[,4]
+test.x <- p.te[,5:7]
+test.y <- p.te[,4]
+
+get.label <- function(X) {
+  label <- array(0, dim=dim(X))
+  d <- dim(X)[1]
+  w <- dim(X)[2]
+  for (i in 0:(w-1)) {
+    for (j in 1:d) {
+      label[i*d+j] <- X[(i*d+j)%%(w*d)+1]
+    }
+  }
+  return (label)
+}
+X.train.label <- get.label(t(train.x))
+X.val.label <- get.label(t(test.x))
+
+X.train <- list(data=t(train.x), label=X.train.label)
+X.val <- list(data=t(test.x), label=X.val.label)
+
+
+#X.train <- list(data=t(train.x), label=X.train.label)
+#X.val <- list(data=t(test.x), label=X.val.label)
+
+batch.size = 5
+seq.len = 5
+num.hidden = 3
+num.embed = 3
+num.rnn.layer = 1
+num.lstm.layer = 1
+num.round = 1
+update.period = 1
+learning.rate= 0.1
+wd=0.00001
+clip_gradient=1
+
+mx.set.seed(0)
+
+mx.rnn <- function(num.hidden, indata, prev.state, param, seqidx, 
+                   layeridx, dropout=0., batch.norm=FALSE) {
+  if (dropout > 0. )
+    indata <- mx.symbol.Dropout(data=indata, p=dropout)
+  i2h <- mx.symbol.FullyConnected(data=indata,
+                                  weight=param$i2h.weight,
+                                  bias=param$i2h.bias,
+                                  num.hidden=num.hidden,
+                                  name=paste0("t", seqidx, ".l", layeridx, ".i2h"))
+  h2h <- mx.symbol.FullyConnected(data=prev.state$h,
+                                  weight=param$h2h.weight,
+                                  bias=param$h2h.bias,
+                                  num.hidden=num.hidden,
+                                  name=paste0("t", seqidx, ".l", layeridx, ".h2h"))
+  hidden <- i2h + h2h
+  
+  hidden <- mx.symbol.Activation(data=hidden, act.type="tanh")
+  if (batch.norm)
+    hidden <- mx.symbol.BatchNorm(data=hidden)
+  return (list(h=hidden))
+}
+
+
+model <- mx.rnn(X.train, X.val, 
+                 ctx=mx.cpu(),
+                 num.round=num.round, 
+                 update.period=update.period,
+                 num.rnn.layer=num.rnn.layer, 
+                 seq.len=seq.len,
+                 num.hidden=num.hidden, 
+                 num.embed=num.embed, 
+                 num.label=vocab,
+                 batch.size=batch.size, 
+                 input.size=vocab,
+                 initializer=mx.init.uniform(0.1), 
+                 learning.rate=learning.rate,
+                 wd=wd,
+                 clip_gradient=clip_gradient)
+
+#preds = predict(model,t(test.x))
+
+mx.rnn.inference(num.rnn.layer = num.rnn.layer,input.size = 3,num.hidden = num.hidden,
+                 num.embed = num.embed,num.label = 5,batch.size = batch.size,ctx = mx.cpu(),
+                 dropout = 0,batch.norm = FALSE,arg.params = model$arg.params)
+
+
