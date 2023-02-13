@@ -6,7 +6,7 @@ sms_raw <- read.csv("c:/deep/sms_spam1.csv", stringsAsFactors = FALSE)
 str(sms_raw)
 sms_raw$type <- factor(sms_raw$type)
 str(sms_raw$type) 
-table(sms_raw$type) # 스팸과 햄의 비율을 알고 위해
+table(sms_raw$type) # 스팸과 햄의 비율을 알기 위해
 sms_corpus <- VCorpus(VectorSource(sms_raw$text)) #Corpus:문자들의 집합 -> 데이터정제(소문자로 다 바꿈 등등)
 #Document Term matrix  이후 분석
 

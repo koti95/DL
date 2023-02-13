@@ -52,7 +52,7 @@ test["X6.8off"]<-test$X6.7_takeoff + test$X7.8_takeoff
 test["X8.10off"]<-test$X8.9_takeoff + test$X9.10_takeoff  
 test["X10.12off"]<-test$X10.11_takeoff + test$X11.12_takeoff
 
-## 4. 외부데이터 사용
+## 4. 외부데이터 사요
 # 해당 주요 장소의 임의 지역 경도, 위도
 jeju<-c(126.52969,33.51411) # 제주 측정소 근처
 gosan<-c(126.16283, 33.29382 ) #고산 측정소 근처
