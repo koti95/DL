@@ -7,8 +7,8 @@
 - 맡은 일에 책임감을 가지고, 신중하게 해결합니다.
 
 - ## 좋은 데이터 분석가가 되기 위해 노력합니다 :)
----
-[데이터자격시험](https://www.dataq.or.kr/www/sub/a_05.do)
-[데이터사이언티스트 AI 컴피티션](https://dacon.io/)
-[JLPT ::](https://www.jlpt.or.kr/jlpt/jlpt1.asp?Mcode=1)
+
+- [데이터자격시험](https://www.dataq.or.kr/www/sub/a_05.do)
+- [데이터사이언티스트 AI 컴피티션](https://dacon.io/)
+- [JLPT ::](https://www.jlpt.or.kr/jlpt/jlpt1.asp?Mcode=1)
 
