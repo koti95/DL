@@ -10,5 +10,5 @@
 
 - [데이터자격시험](https://www.dataq.or.kr/www/sub/a_05.do)
 - [데이터사이언티스트 AI 컴피티션](https://dacon.io/)
-- [JLPT ::](https://www.jlpt.or.kr/jlpt/jlpt1.asp?Mcode=1)
+- [JLPT ::](https://www.bsjlpt.or.kr/web/introduce/jlpt_description.html)
 
